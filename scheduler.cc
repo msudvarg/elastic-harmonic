@@ -15,10 +15,24 @@ int main(int argc, char * argv[]) {
     elastic_space.add_task(Task {23,36,0.1,1});
     elastic_space.generate();
 
-    if(!elastic_space.assign_periods_slow(u)) {
-        std::cout << "Utilization " << u << " is too low!" << std::endl;
+    for (float u = 0.1; u < 0.12; u+=0.001) {
+
+        Chain * chain1 = elastic_space.assign_periods_slow(u);
+        if(!chain1) {
+            std::cout << "Utilization " << u << " is too low!" << std::endl;
+            continue;
+        }
+        std::cout << "\n";
+        print_info(elastic_space.tasks);
+
+        Chain * chain2 = elastic_space.assign_periods(u);
+        std::cout << "\n";
+        print_info(elastic_space.tasks);
+        
+        std::cout << "\nUtilization " << u << " chains " << elastic_space.chains.size() << ' '
+                  << (chain1 - elastic_space.chains.data()) << ' ' << (chain2 - elastic_space.chains.data()) << std::endl;
+
+
     }
-    std::cout << "\n";
-    print_info(elastic_space.tasks);
     return 0;
 }

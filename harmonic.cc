@@ -5,6 +5,7 @@
 #include <limits>
 #include <array>
 #include <list>
+#include <algorithm>
 
 //Project a region from interval i-1 to interval i
 //Any parts of the region overlapping with the overlap between i-1 and i
@@ -13,7 +14,7 @@ Harmonic_Projection find_harmonic(const Tasks & taskset, std::vector<Harmonic_Pr
     
 
     //End of the chain, no more forward projections
-    if (i >= taskset.size()) {
+    if (i >= (int)taskset.size()) {
         if (sources.size()) return sources[0];
         else return {{0,0}, {0}};
     }
@@ -26,7 +27,7 @@ Harmonic_Projection find_harmonic(const Tasks & taskset, std::vector<Harmonic_Pr
     float overlap_min = taskset.back().i.t_max;
 
     //Loop through sources
-    for (int i = 0; i < sources.size(); ++i) {
+    for (size_t i = 0; i < sources.size(); ++i) {
         const Interval & source = sources[i].i;
 
         //There is overlap
@@ -83,9 +84,6 @@ Harmonic_Projection find_harmonic(const Tasks & taskset, std::vector<Harmonic_Pr
     return find_harmonic(taskset, targets, i+1);
 }
 
-void find_harmonics() {
-
-}
 
 //Get all harmonic chains for a set of intervals
 //This is a recursive, depth-first-search projection of harmonic regions
@@ -181,6 +179,15 @@ void print_info(const std::vector<Chain> & harmonics) {
 
 //For a given chain and utilization, compute the corresponding loss
 float compute_loss(const Chain & chain, const float U) {
+    if(U > chain.u_max) return chain.O_min;
+    if(U < chain.u_min) return std::numeric_limits<float>::max();
+    return chain.A * U * U - chain.B * U;
+}
+
+//For a given chain and utilization, compute the corresponding loss
+float compute_loss_with_bounds(const Chain & chain, const float U) {
+    if(U > chain.u_max) return chain.O_min;
+    if(U < chain.u_min) return std::numeric_limits<float>::max();
     return chain.A * U * U - chain.B * U;
 }
 
@@ -270,8 +277,16 @@ void intersections(struct Region, Chain & chain) {
 }
 */
 
-bool operator < (const Region & a, const Region & b) {
-    return a.lb < b.lb;
+bool operator < (const Region & a, const float u) {
+    return a.ub < u;
+}
+
+Chain * get_min(float lb, float ub, Chain * a, Chain * b) {
+    float u = (lb+ub)/2;
+    float loss_a = compute_loss_with_bounds(*a, u);
+    float loss_b = compute_loss_with_bounds(*b, u);
+    if (loss_a < loss_b) return a;
+    else return b;
 }
 
 void Harmonic_Elastic::generate_intersections() {
@@ -283,11 +298,11 @@ void Harmonic_Elastic::generate_intersections() {
     region_list.push_back(Region {chain.u_min, std::numeric_limits<float>::max(), &chain});
 
     //Insert all other chains
-    for (int i = 1; i < chains.size(); ++i) {
+    for (size_t i = 1; i < chains.size(); ++i) {
         Chain & insert = chains[i];
 
         //Check out if lower bound of chain is less than current lowest bound
-        auto it = region_list.begin();
+        std::list<Region>::iterator it = region_list.begin();
         if(insert.u_min < it->chain->u_min) {
             region_list.push_front(Region {insert.u_min, it->chain->u_min, &insert});
         }
@@ -299,8 +314,89 @@ void Harmonic_Elastic::generate_intersections() {
             while(insert.u_min > it->ub) ++it;
             
             Chain & existing = *it->chain;
-            auto next = std::next(it);
 
+            //Pointer to the previous region -- track this so we can merge
+            std::list<Region>::iterator merge_into;
+            if (it == region_list.begin()) merge_into = region_list.end(); //There is no previous region
+            else merge_into = std::prev(it);
+
+            //New chain's minimum utilization is greater than lower bound of region,
+            //so split region
+            if (insert.u_min > it->lb) {
+                region_list.insert(std::next(it), Region {insert.u_min, it->ub, &insert});
+                it->ub = insert.u_min;
+            }
+
+            //Find intersections
+            Chain * line; Chain * parabola;
+            float q=0; //Parabola/parabola intersection
+            float l=0; //Line/parabola intersection
+
+            //Which is line and which is parabola in line/parabola intersection
+            if (insert.O_min < existing.O_min) {
+                line = &existing;
+                parabola = &insert;
+            }
+            else {
+                line = &insert;
+                parabola = &existing;
+            }
+
+            //Calculate parabola/parabola intersection
+            if (parabola->A != line->A && parabola->B != line->B) {
+                q = (parabola->B - line->B)/(parabola->A - line->A);
+                if(q <= it->lb || q >= it->ub || q > parabola->u_max || q > line->u_max) {
+                    q = 0;
+                }
+            }
+
+            //Calculate parabola/line intersection
+            {
+                float A = parabola->A;
+                float B = parabola->B;
+                float O = line->O_min;
+                l = (B - std::sqrt(B+4*A*O))/(2*A);
+                if(l <= it->lb || l >= it->ub || l < line->u_max || l > parabola->u_max) {
+                    l = 0;
+                }
+            }
+
+            //Add regions
+            float new_lb;
+            if (q > 0 && l > 0) {
+                new_lb = std::max(l,q);
+                region_list.insert(it, Region {it->lb, std::min(l,q),
+                    get_min(it->lb, std::min(l,q), &insert, &existing)} );
+                region_list.insert(it, Region {std::min(l,q), new_lb,
+                    get_min(std::min(l,q), new_lb, &insert, &existing)} );
+            }
+            else if (q > 0 || l > 0) {
+                new_lb = std::max(l,q);
+                region_list.insert(it, Region {it->lb, new_lb,
+                    get_min(it->lb, new_lb, &insert, &existing)} );
+            }
+            else {
+                new_lb = it->lb;
+            }
+            it->lb = new_lb;
+            it->chain = get_min(new_lb, it->ub, &insert, &existing);
+
+            //Merge from previous region to end of new set of regions
+            if (merge_into == region_list.end()) merge_into = region_list.begin();
+            ++merge_into;
+            while (merge_into != std::next(it)) {
+                std::list<Region>::iterator prev = std::prev(merge_into);
+                if (prev->chain == merge_into->chain) {
+                    merge_into->lb = prev->lb;
+                    region_list.erase(prev);
+                }
+                ++merge_into;
+            }
+
+            ++it;
+
+
+            /* Old implementation:
             //Check if both chains have equal objectives.
             //If so, replace the old one with the new one if the new one's u_max is larger
             //and the existing chain's u_max is within the region's upper bound.
@@ -364,17 +460,50 @@ void Harmonic_Elastic::generate_intersections() {
                 //intercepts the lower chain after the intersection, but before the upper bound
             }
 
+            */
+
 
         }
 
     }
+
+    //Copy from list to vector for easy search
+    regions.reserve(region_list.size());
+    regions.insert(regions.begin(), std::make_move_iterator(std::begin(region_list)), std::make_move_iterator(std::end(region_list)));
+
+}
+
+//Assign periods based on utilization
+void Harmonic_Elastic::assign_periods(const Chain & chain, float u_max) {
+    if(u_max >= chain.u_max) {
+        u_max = chain.u_max;
+    }
+    tasks[0].t = chain.Y/u_max;
+    for (size_t i = 1; i < chain.harmonics.size(); ++i) {
+        tasks[i].t = tasks[0].t * chain.harmonics[i].a;
+    }
+}
+
+Chain * Harmonic_Elastic::assign_periods(float u_max) {
+
+    if (u_max < u_min) return nullptr;
+
+    std::vector<Region>::iterator region = std::lower_bound(regions.begin(), regions.end(), u_max);
+
+    //Shouldn't ever happen, but just in case
+    if(region == regions.end()) return nullptr;
+
+    assign_periods(*region->chain, u_max);
+    
+    return region->chain;
+
+
 }
 
 
+Chain * Harmonic_Elastic::assign_periods_slow(float u_max) {
 
-bool Harmonic_Elastic::assign_periods_slow(float u_max) {
-
-    if(u_max < u_min) return false;
+    if(u_max < u_min) return nullptr;
 
     float min_loss = std::numeric_limits<float>::max();
     int index = -1;
@@ -386,14 +515,7 @@ bool Harmonic_Elastic::assign_periods_slow(float u_max) {
         //If utilization is less than chain can accomodate, skip        
         if(u_max < chain.u_max) continue;
 
-        //Otherwise, compute loss
-        float loss;
-
-        //If utilization bound is greater than necessary for chain, use its minimum loss
-        if(u_max >= chain.u_max) loss = chain.O_min;
-
-        //Otherwise, compute
-        else loss = compute_loss(chain, u_max);
+        float loss = compute_loss_with_bounds(chain, u_max);
 
         if(loss < min_loss) {
             min_loss = loss;
@@ -402,19 +524,12 @@ bool Harmonic_Elastic::assign_periods_slow(float u_max) {
     }
 
     //Shouldn't ever happen, but just in case
-    if(index < 0) return false;
+    if(index < 0) return nullptr;
 
-    //Assign periods based on utilization
-    const Chain & chain = chains[index];
-    if(u_max >= chain.u_max) {
-        u_max = chain.u_max;
-    }
-    tasks[0].t = chain.Y/u_max;
-    for (size_t i = 1; i < chain.harmonics.size(); ++i) {
-        tasks[i].t = tasks[0].t * chain.harmonics[i].a;
-    }
+    assign_periods(chains[index], u_max);
     
-    return true;
+    
+    return &chains[index];
 }
 
 
@@ -437,4 +552,5 @@ void Harmonic_Elastic::generate() {
     print_info(chains);
     std::cout << '\n';
     print_info(tasks);
+    generate_intersections();
 }

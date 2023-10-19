@@ -22,7 +22,7 @@ struct Chain {
 struct Region {
     float lb, ub;
     struct Chain * chain;
-    friend bool operator < (const Region & a, const Region & b);
+    friend bool operator < (const Region & a, const float u);
 };
 
 // using Harmonics = std::vector<int>;
@@ -41,5 +41,7 @@ struct Harmonic_Elastic {
     void generate();
     void generate_intersections();
 
-    bool assign_periods_slow(float u_max);
+    Chain * assign_periods_slow(float u_max);
+    Chain * assign_periods(float u_max);
+    void assign_periods(const Chain & chain, float u_max);
 };
