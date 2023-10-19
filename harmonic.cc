@@ -3,6 +3,89 @@
 #include <iostream>
 #include <cmath>
 #include <limits>
+#include <array>
+#include <list>
+
+//Project a region from interval i-1 to interval i
+//Any parts of the region overlapping with the overlap between i-1 and i
+//can be carried forward exactly, rather than having the multiples projected up.
+Harmonic_Projection find_harmonic(const Tasks & taskset, std::vector<Harmonic_Projection> sources, const int i) {
+    
+
+    //End of the chain, no more forward projections
+    if (i >= taskset.size()) {
+        if (sources.size()) return sources[0];
+        else return {{0,0}, {0}};
+    }
+
+    const Interval & target = taskset[i].i;
+
+    std::vector<Harmonic_Projection> targets;
+
+    int overlap_index = -1;
+    float overlap_min = taskset.back().i.t_max;
+
+    //Loop through sources
+    for (int i = 0; i < sources.size(); ++i) {
+        const Interval & source = sources[i].i;
+
+        //There is overlap
+        if (target.t_min < source.t_max) {
+
+            auto multiples = sources[i].multiples;
+            multiples.push_back(1);
+
+            //Overlap carried forward exactly rather than being projected up
+            targets.push_back({Interval {target.t_min, source.t_max}, multiples});
+
+            //Check if this is the maximum overlap split
+            if (source.t_min < overlap_min) {
+                overlap_min = source.t_min;
+                overlap_index = i;
+            }
+        }
+
+        //There is no overlap
+        else {
+            int lb = (int) std::ceil(target.t_min/source.t_max);
+            int ub = (int) std::floor(target.t_max / source.t_min);
+
+            //Forward project over multipliers
+            for (int a = lb; a <= ub; ++a) {
+                Interval overlap;
+                auto multiples = sources[i].multiples;
+                multiples.push_back(a);
+
+                overlap.t_min = std::max(source.t_min * a, target.t_min);
+                overlap.t_max = std::min(source.t_max * a, target.t_max);
+                targets.push_back({overlap, multiples});
+            }
+        }
+    }
+
+    //There was overlap, forward project split
+    if (overlap_index > -1) {
+        Interval overlap_split = {overlap_min, target.t_min};
+        int lb = 2;
+        int ub = (int) std::floor(target.t_max / overlap_split.t_min);
+        for (int a = lb; a <= ub; ++a) {
+            Interval overlap;
+            auto multiples = sources[i].multiples;
+            multiples.push_back(a);
+
+            overlap.t_min = std::max(overlap_split.t_min * a, target.t_min);
+            overlap.t_max = std::min(overlap_split.t_max * a, target.t_max);
+            targets.push_back({overlap, multiples});
+        }
+
+    }
+
+    return find_harmonic(taskset, targets, i+1);
+}
+
+void find_harmonics() {
+
+}
 
 //Get all harmonic chains for a set of intervals
 //This is a recursive, depth-first-search projection of harmonic regions
@@ -166,6 +249,9 @@ float compute_chain_properties(const Tasks & taskset, std::vector<Chain> & chain
     return u_min_min;
 }
 
+/*
+void generate_intersections(float u_)
+
 void generate_intersections(float u_max, const std::vector<Chain> & chains) {
     std::vector<Region> regions;
     const Chain & chain = chains[0];
@@ -182,6 +268,109 @@ void generate_intersections(float u_max, const std::vector<Chain> & chains) {
 void intersections(struct Region, Chain & chain) {
 
 }
+*/
+
+bool operator < (const Region & a, const Region & b) {
+    return a.lb < b.lb;
+}
+
+void Harmonic_Elastic::generate_intersections() {
+
+    std::list<Region> region_list;
+
+    //Insert first chain as only region
+    Chain & chain = chains[0];
+    region_list.push_back(Region {chain.u_min, std::numeric_limits<float>::max(), &chain});
+
+    //Insert all other chains
+    for (int i = 1; i < chains.size(); ++i) {
+        Chain & insert = chains[i];
+
+        //Check out if lower bound of chain is less than current lowest bound
+        auto it = region_list.begin();
+        if(insert.u_min < it->chain->u_min) {
+            region_list.push_front(Region {insert.u_min, it->chain->u_min, &insert});
+        }
+
+        //Intersect with all chains already inserted
+        while (it != region_list.end()) {
+
+            //Skip those regions where the upper bound on utilization is less than the new chain's lower bound
+            while(insert.u_min > it->ub) ++it;
+            
+            Chain & existing = *it->chain;
+            auto next = std::next(it);
+
+            //Check if both chains have equal objectives.
+            //If so, replace the old one with the new one if the new one's u_max is larger
+            //and the existing chain's u_max is within the region's upper bound.
+            //And that's it for these regions
+            if (insert.A == existing.A && insert.B == existing.B) {
+                if(insert.u_max > existing.u_max && existing.u_max < it->ub) {
+
+                    //Check if new chain's lower bound is greater than region's lower bound.
+                    //If so, split region at new chain's lower bound
+                    //and insert a new region with the new chain
+                    if (insert.u_min > it->lb) {
+                        region_list.insert(next, Region {insert.u_min, it->ub, &insert});
+                        it->ub = insert.u_min;
+                    }
+                    //Otherwise, replace the old chain directly
+                    else {
+                        it->chain = &insert;
+                    }
+                }
+
+                continue;
+
+            }
+
+
+            //Check which chain is lower right after U=0
+            //It's the one with the larger B value, though if B values are equal,
+            //it's the one with the smaller A value.
+            Chain * lower; Chain * upper;
+            if (insert.B == existing.B) {
+                lower = (insert.A < existing.A ? &insert : &existing);
+                lower = (insert.A < existing.A ? &existing : &insert);
+            }
+            else {
+                lower = (insert.B > existing.B ? &insert : &existing);
+                upper = (insert.B > existing.B ? &existing : &insert);
+            }
+
+            //If A1=/=A2 and B1=/=B2, check where the quadratic objectives intersect
+            //If they don't intersect, set to infinity
+            float quadcept = std::numeric_limits<float>::max();
+            if(insert.A != existing.A && insert.B != existing.B) {
+                quadcept = (insert.B - existing.B)/(insert.A - existing.A);
+            }
+
+            //Check if the lower chain's horizontal (o_max)
+            //intercepts the upper chain before the quadratic intersection
+            if(lower->u_max < quadcept) {
+                //Calculate the intercept
+                float intercept = (upper->B - sqrtf(upper->B*upper->B + 4*upper->A*lower->O_min))/(-2*lower->O_min);
+                if (intercept < quadcept && intercept < it->ub && intercept > it->lb) {
+                    //lower left of intercept, upper right of intercept
+                    //done, move on
+                }
+            }
+            else {
+                //Check if the quadratic intersection happens in the region
+                
+
+                //If so, check if the upper chain's horizontal (o_max)
+                //intercepts the lower chain after the intersection, but before the upper bound
+            }
+
+
+        }
+
+    }
+}
+
+
 
 bool Harmonic_Elastic::assign_periods_slow(float u_max) {
 

@@ -7,6 +7,11 @@ struct Harmonic {
     int a;
 };
 
+struct Harmonic_Projection {
+    Interval i;
+    std::vector<int> multiples;
+};
+
 struct Chain {
     std::vector<Harmonic> harmonics;
     float u_min, u_max, O_min, O_max;
@@ -16,15 +21,17 @@ struct Chain {
 
 struct Region {
     float lb, ub;
-    bool flat;
-    float A, B;
+    struct Chain * chain;
+    friend bool operator < (const Region & a, const Region & b);
 };
 
 // using Harmonics = std::vector<int>;
 
 struct Harmonic_Elastic {
+
     Tasks tasks;
     std::vector<Chain> chains;
+    std::vector<Region> regions;
     float u_min;
 
     Harmonic_Elastic(int n_tasks);
@@ -32,6 +39,7 @@ struct Harmonic_Elastic {
     void add_task(Task t);
 
     void generate();
+    void generate_intersections();
 
     bool assign_periods_slow(float u_max);
 };
