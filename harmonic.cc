@@ -248,7 +248,6 @@ float compute_chain_properties(const Tasks & taskset, std::vector<Chain> & chain
         //TODO: May not be the case if c depends on harmonic range
         chain.O_max = compute_loss(chain, u_min);
         chain.O_min = compute_loss(chain, u_max);
-
         u_min_min = std::min(u_min_min, u_min);
 
     }
@@ -513,7 +512,7 @@ Chain * Harmonic_Elastic::assign_periods_slow(float u_max) {
         const Chain & chain = chains[i];
 
         //If utilization is less than chain can accomodate, skip        
-        if(u_max < chain.u_max) continue;
+        if(u_max < chain.u_min) continue;
 
         float loss = compute_loss_with_bounds(chain, u_max);
 
@@ -549,6 +548,7 @@ void Harmonic_Elastic::generate() {
     print_harmonics(chains);
     std::cout << '\n';
     u_min = compute_chain_properties(tasks, chains);
+    std::cout << "U_min " <<  u_min << std::endl;
     print_info(chains);
     std::cout << '\n';
     print_info(tasks);
