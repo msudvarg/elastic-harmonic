@@ -300,7 +300,7 @@ void Harmonic_Elastic::generate_intersections() {
     for (size_t i = 1; i < chains.size(); ++i) {
         Chain & insert = chains[i];
 
-        //Check out if lower bound of chain is less than current lowest bound
+        //Check if lower bound of chain is less than current lowest bound
         std::list<Region>::iterator it = region_list.begin();
         if(insert.u_min < it->chain->u_min) {
             region_list.push_front(Region {insert.u_min, it->chain->u_min, &insert});
@@ -310,21 +310,21 @@ void Harmonic_Elastic::generate_intersections() {
         while (it != region_list.end()) {
 
             //Skip those regions where the upper bound on utilization is less than the new chain's lower bound
-            while(insert.u_min > it->ub) ++it;
+            while(it->ub <= insert.u_min) ++it;
             
             Chain & existing = *it->chain;
+
+            //New chain's minimum utilization is greater than lower bound of region,
+            //so split region
+            if (insert.u_min > it->lb) {
+                region_list.insert(it, Region {it->lb, insert.u_min, &existing});
+                it->lb = insert.u_min;
+            }
 
             //Pointer to the previous region -- track this so we can merge
             std::list<Region>::iterator merge_into;
             if (it == region_list.begin()) merge_into = region_list.end(); //There is no previous region
             else merge_into = std::prev(it);
-
-            //New chain's minimum utilization is greater than lower bound of region,
-            //so split region
-            if (insert.u_min > it->lb) {
-                region_list.insert(std::next(it), Region {insert.u_min, it->ub, &insert});
-                it->ub = insert.u_min;
-            }
 
             //Find intersections
             Chain * line; Chain * parabola;
@@ -385,7 +385,7 @@ void Harmonic_Elastic::generate_intersections() {
             ++merge_into;
             while (merge_into != std::next(it)) {
                 std::list<Region>::iterator prev = std::prev(merge_into);
-                if (prev->chain == merge_into->chain) {
+                if (merge_into->chain == prev->chain) {
                     merge_into->lb = prev->lb;
                     region_list.erase(prev);
                 }
@@ -542,15 +542,22 @@ void Harmonic_Elastic::add_task(Task t) {
 
 void Harmonic_Elastic::generate() {
     chains = enumerate_harmonics(tasks, {tasks[0].i, 1}, 1, {});
+
+#ifdef DEBUGINFO
     print_harmonics(chains);
+#endif
+
     backpropagate(chains);
+    u_min = compute_chain_properties(tasks, chains);
+    generate_intersections();
+    
+#ifdef DEBUGINFO
     std::cout << '\n';
     print_harmonics(chains);
     std::cout << '\n';
-    u_min = compute_chain_properties(tasks, chains);
     std::cout << "U_min " <<  u_min << std::endl;
     print_info(chains);
     std::cout << '\n';
     print_info(tasks);
-    generate_intersections();
+#endif
 }
