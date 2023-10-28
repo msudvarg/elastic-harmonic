@@ -7,24 +7,24 @@
 #include <list>
 #include <algorithm>
 
+//This is the algorithm described in Section IV.B
 //Project a region from interval i-1 to interval i
 //Any parts of the region overlapping with the overlap between i-1 and i
-//can be carried forward exactly, rather than having the multiples projected up.
-Harmonic_Projection find_harmonic(const Tasks & taskset, std::vector<Harmonic_Projection> sources, const int i) {
+//can be carried forward exactly, rather than having the multipliers projected up.
+Projected_Harmonic_Interval find_harmonic(const std::vector<Interval> & period_intervals, std::vector<Projected_Harmonic_Interval> sources, const size_t i) {
     
+    //No sources, we did not succeed in projection
+    if (!sources.size()) return {{0,0}, {0}};
 
     //End of the chain, no more forward projections
-    if (i >= (int)taskset.size()) {
-        if (sources.size()) return sources[0];
-        else return {{0,0}, {0}};
-    }
+    if (i >= period_intervals.size()) return sources[0];
 
-    const Interval & target = taskset[i].i;
+    const Interval & target = period_intervals[i];
 
-    std::vector<Harmonic_Projection> targets;
+    std::vector<Projected_Harmonic_Interval> targets;
 
     int overlap_index = -1;
-    float overlap_min = taskset.back().i.t_max;
+    float overlap_min = period_intervals.back().t_max;
 
     //Loop through sources
     for (size_t i = 0; i < sources.size(); ++i) {
@@ -33,11 +33,11 @@ Harmonic_Projection find_harmonic(const Tasks & taskset, std::vector<Harmonic_Pr
         //There is overlap
         if (target.t_min < source.t_max) {
 
-            auto multiples = sources[i].multiples;
-            multiples.push_back(1);
+            auto multipliers = sources[i].multipliers;
+            multipliers.push_back(1);
 
             //Overlap carried forward exactly rather than being projected up
-            targets.push_back({Interval {target.t_min, source.t_max}, multiples});
+            targets.push_back({Interval {target.t_min, source.t_max}, multipliers});
 
             //Check if this is the maximum overlap split
             if (source.t_min < overlap_min) {
@@ -54,12 +54,12 @@ Harmonic_Projection find_harmonic(const Tasks & taskset, std::vector<Harmonic_Pr
             //Forward project over multipliers
             for (int a = lb; a <= ub; ++a) {
                 Interval overlap;
-                auto multiples = sources[i].multiples;
-                multiples.push_back(a);
+                auto multipliers = sources[i].multipliers;
+                multipliers.push_back(a);
 
                 overlap.t_min = std::max(source.t_min * a, target.t_min);
                 overlap.t_max = std::min(source.t_max * a, target.t_max);
-                targets.push_back({overlap, multiples});
+                targets.push_back({overlap, multipliers});
             }
         }
     }
@@ -71,31 +71,78 @@ Harmonic_Projection find_harmonic(const Tasks & taskset, std::vector<Harmonic_Pr
         int ub = (int) std::floor(target.t_max / overlap_split.t_min);
         for (int a = lb; a <= ub; ++a) {
             Interval overlap;
-            auto multiples = sources[i].multiples;
-            multiples.push_back(a);
+            auto multipliers = sources[i].multipliers;
+            multipliers.push_back(a);
 
             overlap.t_min = std::max(overlap_split.t_min * a, target.t_min);
             overlap.t_max = std::min(overlap_split.t_max * a, target.t_max);
-            targets.push_back({overlap, multiples});
+            targets.push_back({overlap, multipliers});
         }
 
     }
 
-    return find_harmonic(taskset, targets, i+1);
+    return find_harmonic(period_intervals, targets, i+1);
 }
 
+
+//This is the algorithm described in Section IV.B
+bool find_harmonic(Tasks & taskset) {
+
+    //Sort by lower bound of intervals
+    std::sort(taskset.begin(), taskset.end());
+
+    //Figure out which tasks to skip
+    std::vector<Interval> period_intervals;
+    std::vector<bool> interval_indices;
+    for(size_t i = 0; i < taskset.size() - 1; ++i) {
+        if(taskset[i].i.t_max < taskset[i+1].i.t_max) {
+            period_intervals.push_back(taskset[i].i);
+            interval_indices.push_back(true);
+        }
+        else interval_indices.push_back(false);
+    }
+    period_intervals.push_back(taskset.back().i);
+    interval_indices.push_back(taskset.size()-1);
+
+    //Find projections
+    Projected_Harmonic_Interval phi =
+        find_harmonic(period_intervals,
+                      std::vector<Projected_Harmonic_Interval> { {period_intervals[0], {0}} },
+                      1);
+
+    if(phi.multipliers.size() != period_intervals.size()) return false;
+
+    //Get period assignments from projection
+    taskset.back().t = phi.i.t_min;
+
+    std::cout << phi.multipliers.size() << ' ' << taskset.size() << ' ' << period_intervals.size() << ' ' << interval_indices.size() << std::endl;
+
+    //Index into multipliers
+    size_t mult_idx = phi.multipliers.size() - 1;
+    for (ssize_t task_idx = taskset.size() - 2; task_idx >= 0; --task_idx) {
+        if(interval_indices[task_idx]) {
+            taskset[task_idx].t = taskset[task_idx+1].t/phi.multipliers[mult_idx];
+            --mult_idx;
+        }
+        else {            
+            taskset[task_idx].t = taskset[task_idx+1].t;
+        }
+    }
+
+    return true;
+}
 
 //Get all harmonic chains for a set of intervals
 //This is a recursive, depth-first-search projection of harmonic regions
 //Takes a set of tasks, the current harmonic being projected,
 //an index (which interval are we projecting to), and a harmonic chain
-std::vector<Chain> enumerate_harmonics(const Tasks & taskset, const Harmonic harmonic, const int i, Chain chain) {
+std::vector<Chain> enumerate_harmonics(const Tasks & taskset, const Projected_Harmonic_Zone harmonic, const size_t i, Chain chain) {
 
     //Push back the current harmonic into the chain
     chain.harmonics.push_back(harmonic);
 
     //No more intervals to forward project
-    if (i == (int)taskset.size()) return {chain};
+    if (i == taskset.size()) return {chain};
 
     //Vector of chains
     std::vector<Chain> chains;
@@ -113,7 +160,7 @@ std::vector<Chain> enumerate_harmonics(const Tasks & taskset, const Harmonic har
         Interval overlap;
         overlap.t_min = std::max(l.t_min * a, r.t_min);
         overlap.t_max = std::min(l.t_max * a, r.t_max);
-        Harmonic h {overlap, a};
+        Projected_Harmonic_Zone h {overlap, a};
 
         //Recursively project harmonic region to end
         auto new_chains = enumerate_harmonics(taskset, h, i+1, chain);
@@ -137,7 +184,7 @@ void backpropagate(std::vector<Chain> & chains) {
         auto & chain = full_chain.harmonics;
 
         //Walk backward from the end of the chain
-        for(int i = chain.size() - 1; i > 0; --i) {
+        for(size_t i = chain.size() - 1; i > 0; --i) {
 
             //Trim the regions
             Interval & l = chain[i-1].i;
@@ -159,7 +206,7 @@ void backpropagate(std::vector<Chain> & chains) {
 void print_harmonics(const std::vector<Chain> & harmonics) {
     
     for(auto chain : harmonics) {
-        for (Harmonic h : chain.harmonics) {
+        for (Projected_Harmonic_Zone h : chain.harmonics) {
             std::cout << h.a << ' ' << h.i.t_min << ' ' << h.i.t_max << " | ";
         }
         std::cout << std::endl;
@@ -254,27 +301,6 @@ float compute_chain_properties(const Tasks & taskset, std::vector<Chain> & chain
 
     return u_min_min;
 }
-
-/*
-void generate_intersections(float u_)
-
-void generate_intersections(float u_max, const std::vector<Chain> & chains) {
-    std::vector<Region> regions;
-    const Chain & chain = chains[0];
-    regions.push_back({0, chain.u_min, true, chain.O_max, 0});
-    regions.push_back({chain.u_min, chain.u_max, false, chain.A, chain.B});
-    regions.push_back({chain.u_max, u_max, true, chain.O_min, 0});
-
-    // for(int i = 1; i < chains.size(); ++i) {
-    //     const Chain & chain = chains[i];
-        
-    // }
-}
-
-void intersections(struct Region, Chain & chain) {
-
-}
-*/
 
 bool operator < (const Region & a, const float u) {
     return a.ub < u;
@@ -394,74 +420,6 @@ void Harmonic_Elastic::generate_intersections() {
 
             ++it;
 
-
-            /* Old implementation:
-            //Check if both chains have equal objectives.
-            //If so, replace the old one with the new one if the new one's u_max is larger
-            //and the existing chain's u_max is within the region's upper bound.
-            //And that's it for these regions
-            if (insert.A == existing.A && insert.B == existing.B) {
-                if(insert.u_max > existing.u_max && existing.u_max < it->ub) {
-
-                    //Check if new chain's lower bound is greater than region's lower bound.
-                    //If so, split region at new chain's lower bound
-                    //and insert a new region with the new chain
-                    if (insert.u_min > it->lb) {
-                        region_list.insert(next, Region {insert.u_min, it->ub, &insert});
-                        it->ub = insert.u_min;
-                    }
-                    //Otherwise, replace the old chain directly
-                    else {
-                        it->chain = &insert;
-                    }
-                }
-
-                continue;
-
-            }
-
-
-            //Check which chain is lower right after U=0
-            //It's the one with the larger B value, though if B values are equal,
-            //it's the one with the smaller A value.
-            Chain * lower; Chain * upper;
-            if (insert.B == existing.B) {
-                lower = (insert.A < existing.A ? &insert : &existing);
-                lower = (insert.A < existing.A ? &existing : &insert);
-            }
-            else {
-                lower = (insert.B > existing.B ? &insert : &existing);
-                upper = (insert.B > existing.B ? &existing : &insert);
-            }
-
-            //If A1=/=A2 and B1=/=B2, check where the quadratic objectives intersect
-            //If they don't intersect, set to infinity
-            float quadcept = std::numeric_limits<float>::max();
-            if(insert.A != existing.A && insert.B != existing.B) {
-                quadcept = (insert.B - existing.B)/(insert.A - existing.A);
-            }
-
-            //Check if the lower chain's horizontal (o_max)
-            //intercepts the upper chain before the quadratic intersection
-            if(lower->u_max < quadcept) {
-                //Calculate the intercept
-                float intercept = (upper->B - sqrtf(upper->B*upper->B + 4*upper->A*lower->O_min))/(-2*lower->O_min);
-                if (intercept < quadcept && intercept < it->ub && intercept > it->lb) {
-                    //lower left of intercept, upper right of intercept
-                    //done, move on
-                }
-            }
-            else {
-                //Check if the quadratic intersection happens in the region
-                
-
-                //If so, check if the upper chain's horizontal (o_max)
-                //intercepts the lower chain after the intersection, but before the upper bound
-            }
-
-            */
-
-
         }
 
     }
@@ -540,8 +498,10 @@ void Harmonic_Elastic::add_task(Task t) {
     tasks.push_back(t);
 }
 
-void Harmonic_Elastic::generate() {
+bool Harmonic_Elastic::generate() {
     chains = enumerate_harmonics(tasks, {tasks[0].i, 1}, 1, {});
+
+    if(!chains.size()) return false;
 
 #ifdef DEBUGINFO
     print_harmonics(chains);
@@ -560,4 +520,20 @@ void Harmonic_Elastic::generate() {
     std::cout << '\n';
     print_info(tasks);
 #endif
+
+    return true;
+}
+
+bool verify_harmonic(const Tasks & taskset) {
+    for (size_t i = 0; i < taskset.size(); ++i) {
+        const Task & task = taskset[i];
+        if(task.t < task.i.t_min || task.t > task.i.t_max) return false;
+        if(i > 0) {
+            float ratio = task.t/taskset[i-1].t;
+            //Check integer ratio
+            if( std::abs(std::floor(ratio) - ratio) / ratio > 0.0001 ) return false;
+        }
+    }
+
+    return true;
 }
