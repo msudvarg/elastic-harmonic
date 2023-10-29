@@ -10,10 +10,9 @@ int main(int argc, char * argv[]) {
     if (argc > 1) u = atof(argv[1]);
 
     //Task takes T_min, T_max, C, E
-    elastic_space.add_task(Task {6,6,0.3,3});
-    elastic_space.add_task(Task {11,18,0.3,3});
-    elastic_space.add_task(Task {12,17,0.7,4});
-    elastic_space.add_task(Task {23,36,0.1,1});
+    elastic_space.add_task(Task {5, 20, 0.0015, 0.0025682});
+    elastic_space.add_task(Task {50, 150, 31.3, 378.19756});
+    elastic_space.add_task(Task {50, 1000, 354.55, 765098.615});
 
     if(!elastic_space.generate()) {
         std::cout << "Could not make harmonic assignment!" << std::endl;
