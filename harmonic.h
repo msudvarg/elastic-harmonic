@@ -1,6 +1,8 @@
 #pragma once
 
 #include "task.h"
+#include <cstddef>
+using std::size_t;
 
 //Denotes a projection to the interval i with multiplier a from the previous interval
 struct Projected_Harmonic_Zone {
