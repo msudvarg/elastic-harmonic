@@ -35,6 +35,9 @@ struct Task {
         e {_e} {}
 
     bool operator < (const Task & t) {
+        if (i.t_min == t.i.t_min) {
+            return i.t_max > t.i.t_max;
+        }
         return i.t_min < t.i.t_min;
     }
 };

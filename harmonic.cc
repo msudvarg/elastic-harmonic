@@ -11,13 +11,13 @@
 //Project a region from interval i-1 to interval i
 //Any parts of the region overlapping with the overlap between i-1 and i
 //can be carried forward exactly, rather than having the multipliers projected up.
-Projected_Harmonic_Interval find_harmonic(const std::vector<Interval> & period_intervals, std::vector<Projected_Harmonic_Interval> sources, const size_t i) {
+std::vector<Projected_Harmonic_Interval> find_harmonic(const std::vector<Interval> & period_intervals, std::vector<Projected_Harmonic_Interval> sources, const size_t i) {
     
     //No sources, we did not succeed in projection
-    if (!sources.size()) return {{0,0}, {0}};
+    if (!sources.size()) return {{{0,0}, {0}}};
 
     //End of the chain, no more forward projections
-    if (i >= period_intervals.size()) return sources[0];
+    if (i >= period_intervals.size()) return sources;
 
     const Interval & target = period_intervals[i];
 
@@ -27,22 +27,26 @@ Projected_Harmonic_Interval find_harmonic(const std::vector<Interval> & period_i
     float overlap_min = period_intervals.back().t_max;
 
     //Loop through sources
-    for (size_t i = 0; i < sources.size(); ++i) {
-        const Interval & source = sources[i].i;
+    for (size_t s = 0; s < sources.size(); ++s) {
+        const Interval & source = sources[s].i;
 
         //There is overlap
         if (target.t_min < source.t_max) {
 
-            auto multipliers = sources[i].multipliers;
+            auto multipliers = sources[s].multipliers;
             multipliers.push_back(1);
+            
+            Interval overlap;
+            overlap.t_min = std::max(source.t_min, target.t_min);
+            overlap.t_max = source.t_max;
 
             //Overlap carried forward exactly rather than being projected up
-            targets.push_back({Interval {target.t_min, source.t_max}, multipliers});
+            targets.push_back({overlap, multipliers});
 
             //Check if this is the maximum overlap split
             if (source.t_min < overlap_min) {
                 overlap_min = source.t_min;
-                overlap_index = i;
+                overlap_index = s;
             }
         }
 
@@ -54,7 +58,7 @@ Projected_Harmonic_Interval find_harmonic(const std::vector<Interval> & period_i
             //Forward project over multipliers
             for (int a = lb; a <= ub; ++a) {
                 Interval overlap;
-                auto multipliers = sources[i].multipliers;
+                auto multipliers = sources[s].multipliers;
                 multipliers.push_back(a);
 
                 overlap.t_min = std::max(source.t_min * a, target.t_min);
@@ -71,7 +75,7 @@ Projected_Harmonic_Interval find_harmonic(const std::vector<Interval> & period_i
         int ub = (int) std::floor(target.t_max / overlap_split.t_min);
         for (int a = lb; a <= ub; ++a) {
             Interval overlap;
-            auto multipliers = sources[i].multipliers;
+            auto multipliers = sources[overlap_index].multipliers;
             multipliers.push_back(a);
 
             overlap.t_min = std::max(overlap_split.t_min * a, target.t_min);
@@ -86,7 +90,7 @@ Projected_Harmonic_Interval find_harmonic(const std::vector<Interval> & period_i
 
 
 //This is the algorithm described in Section IV.B
-bool find_harmonic(Tasks & taskset) {
+bool find_harmonic(Tasks & taskset, int * n_harmonics) {
 
     //Sort by lower bound of intervals
     std::sort(taskset.begin(), taskset.end());
@@ -94,28 +98,33 @@ bool find_harmonic(Tasks & taskset) {
     //Figure out which tasks to skip
     std::vector<Interval> period_intervals;
     std::vector<bool> interval_indices;
-    for(size_t i = 0; i < taskset.size() - 1; ++i) {
-        if(taskset[i].i.t_max < taskset[i+1].i.t_max) {
-            period_intervals.push_back(taskset[i].i);
-            interval_indices.push_back(true);
-        }
-        else interval_indices.push_back(false);
-    }
+
     period_intervals.push_back(taskset.back().i);
     interval_indices.push_back(taskset.size()-1);
 
+    for(ssize_t i = taskset.size()-2; i >= 0; --i) {
+        if(period_intervals.back().t_max > taskset[i].i.t_max) {
+            period_intervals.push_back(taskset[i].i);
+            interval_indices.push_back(true);
+        }
+        else interval_indices.push_back(false);        
+    }
+    std::reverse(period_intervals.begin(), period_intervals.end());
+    std::reverse(interval_indices.begin(), interval_indices.end());
+
     //Find projections
-    Projected_Harmonic_Interval phi =
-        find_harmonic(period_intervals,
+    std::vector<Projected_Harmonic_Interval> phis = find_harmonic(period_intervals,
                       std::vector<Projected_Harmonic_Interval> { {period_intervals[0], {0}} },
                       1);
+    Projected_Harmonic_Interval & phi = phis[0];
+        
 
     if(phi.multipliers.size() != period_intervals.size()) return false;
 
+    if(n_harmonics) *n_harmonics = phis.size();
+
     //Get period assignments from projection
     taskset.back().t = phi.i.t_min;
-
-    std::cout << phi.multipliers.size() << ' ' << taskset.size() << ' ' << period_intervals.size() << ' ' << interval_indices.size() << std::endl;
 
     //Index into multipliers
     size_t mult_idx = phi.multipliers.size() - 1;
@@ -494,6 +503,9 @@ Harmonic_Elastic::Harmonic_Elastic(int n_tasks) {
     tasks.reserve(n_tasks);
 }
 
+Harmonic_Elastic::Harmonic_Elastic(Tasks _tasks) :
+    tasks { std::move(_tasks) } {}
+
 void Harmonic_Elastic::add_task(Task t) {
     tasks.push_back(t);
 }
@@ -527,11 +539,14 @@ bool Harmonic_Elastic::generate() {
 bool verify_harmonic(const Tasks & taskset) {
     for (size_t i = 0; i < taskset.size(); ++i) {
         const Task & task = taskset[i];
-        if(task.t < task.i.t_min || task.t > task.i.t_max) return false;
+
+        //Period is too low
+        if( (task.i.t_min - task.t)/task.t > .0001 ) return false;
+        if ( (task.t - task.i.t_max)/task.t > 0.0001 ) return false;
         if(i > 0) {
             float ratio = task.t/taskset[i-1].t;
             //Check integer ratio
-            if( std::abs(std::floor(ratio) - ratio) / ratio > 0.0001 ) return false;
+            if( std::abs(std::round(ratio) - ratio) / ratio > 0.0001 ) return false;
         }
     }
 
