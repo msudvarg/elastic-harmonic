@@ -58,12 +58,15 @@ class Harmonic_Elastic {
 public:
     const inline float get_u_min() { return u_min; }
     const inline Tasks & get_tasks() { return tasks; }
+    const inline size_t get_num_chains() { return chains.size(); }
+    const inline size_t get_num_regions() { return regions.size(); }
     Chain * assign_periods_slow(float u_max);
     Chain * assign_periods(float u_max);
     bool generate();
     void add_task(Task t);
     Harmonic_Elastic(int n_tasks);
+    Harmonic_Elastic(Tasks _tasks);
 };
 
-bool find_harmonic(Tasks & taskset);
+bool find_harmonic(Tasks & taskset, int * n_harmonics = nullptr);
 bool verify_harmonic(const Tasks & taskset);
