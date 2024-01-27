@@ -5,7 +5,7 @@ enumerate_phi.cc
 This produces results for
 Figure 4 of Section V: "The Ordered Harmonic Elastic Problem."
 
-For numbers of tasks from 1--30 and values k from 1--100,
+For numbers of tasks from 2--30 and values k from 1--100,
 this computes h_{n,k} the number of possible projected harmonic intervals.
 
 From the paper, we have:
@@ -17,12 +17,12 @@ h_{n,k} = sum_{l=1}^k h
 #include <iostream>
 #include <cmath>
 #include <numeric>
-#include <omp.h>
 
 constexpr int max_tasks = 30;
 constexpr int k = 100;
 
-long long counts[max_tasks][k];
+//We skip task 1
+long long counts[max_tasks-1][k];
 
 
 /*
@@ -30,39 +30,32 @@ long long counts[max_tasks][k];
 
     Recursively project harmonic intervals.
 
-    We have a system of `n_tasks`
-    At task number `task`-1 we have already achieved a product of `prod`
+    We have a system of n_tasks
+    At task n-1 we have already achieved a product of prod
     In other words,
-    a_2 * a_3 * ... * a_{task-1} = prod
+    a_1 * a_2 * a_3 * ... * a_{n-1} = prod
+    (where a_1 = 1)
 
-    We can now project onto a_task and further to the end
+    We can now project onto a_n and further to the end
 
 */
-void recurse_ind(const int prod, const int task, const int n_tasks) {
+void recurse_ind(const int prod, const int n, const int n_tasks) {
 
-    //End condition: product of multipliers exceeds k
+    //Product of multipliers exceeds k,
+    //Do not keep projecting
     if(prod > k) return;
 
-    for (int i = 1; i <= k; ++i) {
-        //prod = a_2 * a_3 * ... * a_{task-1}
-        //x = prod * i, where i represents a_task
-        const int x = i * prod;
+    for (int a_n = 1; a_n <= k; ++a_n) {
+        //prod = a_1 * a_2 * a_3 * ... * a_{n-1}
+        const int l = prod * a_n;
 
-        //We are at the last task
-        if (task == n_tasks) {
+        //Increase count for h*_{n,l}
+        //(Index at n-2 because we skip task 1)
+        if (l <= k) counts[n-2][l-1]++;
 
-            //As long as the total product x does not exceed k,
-            //Increase the count of ways to achieve a multiple equal to x
-            if (x <= k) counts[task-1][x-1]++;
-            else return;
-        }
+        //Project onto the next task
+        if (n < n_tasks) recurse_ind(l, n+1, n_tasks);
 
-        //We are not at the last task
-        else {
-            
-            //Continue to the end
-            recurse_ind(x, task+1, n_tasks);
-        }
     }
 }
 
@@ -85,28 +78,23 @@ void recurse_ind(const int prod, const int task, const int n_tasks) {
 */
 void get_harmonic_counts() {
 
-    //Run in parallel for better performance
-    #pragma omp parallel
-    {
-        int begin = omp_get_thread_num();
-        int step = omp_get_num_threads();
-        for (int n_tasks = begin; n_tasks < max_tasks; n_tasks += step) {
+    
+    //Recursively compute all values h*_{n,l} for a given n
+    //We start by projecting from task 1 to task 2
+    //The product prod = a_1 is 1, since a_1 is by definition 1
+    recurse_ind(1, 2, max_tasks);    
 
-            //Recursively compute all values h*_{n,l} for a given n
-            //(We use n_tasks+1 due to 0-indexing)
-            recurse_ind(1, 1, n_tasks+1);
-
-            //Compute h_{n,k} by summing over h* values
-            for (int i = 1; i < k; ++i) {
-                counts[n_tasks][i] += counts[n_tasks][i-1];
-            }
+    //Compute h_{n,k} by summing over h* values
+    for (int n_tasks = 2; n_tasks <= max_tasks; ++n_tasks) {
+        for (int l = 1; l < k; ++l) {
+            counts[n_tasks-2][l] += counts[n_tasks-2][l-1];
         }
     }
 
     //Print results
-    for (int n_tasks = 0; n_tasks < max_tasks; ++n_tasks) {
-        for (int i = 0; i<k; ++i) {
-            std::cout << n_tasks+1 << ' ' << i+1 << ' ' << counts[n_tasks][i] << std::endl;
+    for (int n_tasks = 2; n_tasks <= max_tasks; ++n_tasks) {
+        for (int l = 1; l<=k; ++l) {
+            std::cout << n_tasks << ' ' << l << ' ' << counts[n_tasks-2][l-1] << std::endl;
         }
     }
 }
