@@ -42,10 +42,6 @@ struct Task {
     }
 };
 
-// bool operator < (const Task & a, const Task & b) {
-//     return a.i.t_min < b.i.t_min;
-// }
-
 //A system of tasks
 using Tasks = std::vector<Task>;
 

@@ -7,7 +7,7 @@
 #include <list>
 #include <algorithm>
 
-//This is the algorithm described in Section IV.B
+//Algorithm 2 in Section IV.B
 //Project a region from interval i-1 to interval i
 //Any parts of the region overlapping with the overlap between i-1 and i
 //can be carried forward exactly, rather than having the multipliers projected up.
@@ -24,7 +24,7 @@ std::vector<Projected_Harmonic_Interval> find_harmonic(const std::vector<Interva
     std::vector<Projected_Harmonic_Interval> targets;
 
     int overlap_index = -1;
-    float overlap_min = period_intervals.back().t_max;
+    float overlap_min = target.t_min;
 
     //Loop through sources
     for (size_t s = 0; s < sources.size(); ++s) {
@@ -89,7 +89,7 @@ std::vector<Projected_Harmonic_Interval> find_harmonic(const std::vector<Interva
 }
 
 
-//This is the algorithm described in Section IV.B
+//Algorithm 1 in Section IV.B
 bool find_harmonic(Tasks & taskset, int * n_harmonics) {
 
     //Sort by lower bound of intervals
