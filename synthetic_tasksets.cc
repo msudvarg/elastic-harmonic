@@ -136,7 +136,7 @@ int main(int argc, char * argv[]) {
                 t0 = std::chrono::high_resolution_clock::now();
                 elastic_space.assign_periods(u);
                 t1 = std::chrono::high_resolution_clock::now();
-                std::cout << std::chrono::duration_cast<std::chrono::microseconds>(t1-t0).count() << ' ';
+                std::cout << std::chrono::duration_cast<std::chrono::nanoseconds>(t1-t0).count() << ' ';
                 if(!verify_harmonic(elastic_space.get_tasks())) {
                     std::cout << "Could not verify harmonics 2!" << std::endl;
                     return -1;
