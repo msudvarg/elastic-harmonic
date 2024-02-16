@@ -1,0 +1,137 @@
+{
+    "thresh_arr": [
+        100,
+        80,
+        60,
+        40,
+        30,
+        20,
+        15,
+        10,
+        8,
+        6
+    ],
+    "area_arr": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+    ],
+    "pix_lim": [
+        39,
+        170
+    ],
+    "pxlim_gnd": [
+        170,
+        185
+    ],
+    "pxlim_hv": [
+        21,
+        35
+    ],
+    "hv_px0": [
+        29.94,
+        24.73
+    ],
+    "gnd_px0": [
+        182.6,
+        176.3
+    ],
+    "hv_slope": [
+        0.0007,
+        0.0005
+    ],
+    "gnd_slope": [
+        0.0001,
+        -0.0001
+    ],
+    "pyc": [
+        532.28,
+        529.28
+    ],
+    "flight_num": 1,
+    "Npx": 196,
+    "Npy": 1024,
+    "spot2pyc": -15.22,
+    "a": 0.011176,
+    "b": 0.127,
+    "Ls": 0.1743202,
+    "Lc": 0.365277399999999,
+    "x_min": 0.2,
+    "x_max": 0.8,
+    "y_min": -0.035,
+    "y_max": 0.035,
+    "Qt_set": 0.000233376,
+    "P_ratio": 0.95,
+    "housekeeping_ver": 1,
+    "charger_type": "RAD",
+    "HV_level_method": 2,
+    "Qa_min_for_inv": 0.05,
+    "bnd_interval": 1,
+    "max_resident_time": 3,
+    "Vm_range": [
+        6000,
+        5000,
+        4000,
+        3000,
+        2000
+    ],
+    "case_num": [
+        1361,
+        1551,
+        3041,
+        1331,
+        1121
+    ],
+    "dt": 1,
+    "N_Dp_bin": 30,
+    "chgs": 2,
+    "Dp_min": 1e-08,
+    "Dp_max": 6e-07,
+    "N": 30,
+    "use_normalized_inversion": false,
+    "minI_for_inversion": 6,
+    "inlet_ver": "FIMS_V2.3",
+    "inlet_eff_size": [
+        0.04,
+        0.0095
+    ],
+    "Q": [
+        0.26,
+        0.26
+    ],
+    "L": [
+        4.5534
+    ],
+    "Q_pre_FIMS": [
+        8.89,
+        8.89,
+        3.89,
+        3.89,
+        3.89,
+        3.89,
+        1.97,
+        1.01,
+        1.01
+    ],
+    "L_pre_FIMS": [
+        5.0,
+        0.72,
+        0.12,
+        0.1,
+        0.3,
+        0.1,
+        0.42,
+        0.09,
+        0.04
+    ],
+    "HK_reading_duration": 500,
+    "image_processing_duration": 100,
+    "data_inversion_duration": 1000
+}
