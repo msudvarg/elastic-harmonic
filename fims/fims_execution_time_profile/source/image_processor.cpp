@@ -117,7 +117,7 @@ void Image_Processor::fileread_n_process() {
     // struct timespec cpustart, cpuend;
     // clock_gettime(CLOCK_THREAD_CPUTIME_ID, &cpustart);
 
-    // std::vector<double> image_process_time_(images.size(), 0);
+    std::vector<double> image_process_time(images.size(), 0);
     std::vector<double> image_process_time_user(images.size(), 0);
     std::vector<double> image_process_time_sys(images.size(), 0);
     auto image_process_duration = std::chrono::milliseconds(int(fims.image_processing_duration));
@@ -147,23 +147,23 @@ void Image_Processor::fileread_n_process() {
         auto stop = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
         // process_cost << duration.count() << " ";
-        image_process_time_[i] = duration.count();
+        image_process_time[i] = duration.count();
 
         start += image_process_duration;
         std::this_thread::sleep_until(start);
     }
 
-    std::ofstream image_process_time("../result_/run_time/image_process_time.txt");
-    std::ofstream image_process_cost_user_("../result_/run_time/image_process_cost_user.txt");
-    std::ofstream image_process_cost_sys_("../result_/run_time/image_process_cost_sys.txt");
-    for(int i = 0; i < image_process_time_.size(); ++i) {
-        image_process_time << image_process_time_[i] << " " << std::flush;
-        image_process_cost_user_ << image_process_cost_user[i] << " " << std::flush;
-        image_process_cost_sys_ << image_process_cost_sys[i] << " " << std::flush;
+    std::ofstream image_process_time_("../result_/run_time/image_process_time.txt");
+    std::ofstream image_process_time_user_("../result_/run_time/image_process_time_user.txt");
+    std::ofstream image_process_time_sys_("../result_/run_time/image_process_time_sys.txt");
+    for(int i = 0; i < image_process_time.size(); ++i) {
+        image_process_time_ << image_process_time[i] << " " << std::flush;
+        image_process_time_user_ << image_process_time_user[i] << " " << std::flush;
+        image_process_time_sys_ << image_process_time_sys[i] << " " << std::flush;
     }
-    image_process_time.close();
-    image_process_cost_user.close();
-    image_process_cost_sys.close();
+    image_process_time_.close();
+    image_process_time_user_.close();
+    image_process_time_sys_.close();
     // process_cost.close();
 }
 
