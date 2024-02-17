@@ -12,7 +12,9 @@ fig, ax = plt.subplots(figsize=(4.2, 3))
 
 # paths to read
 paths = [] 
-prefix = "/home/ao/forMarion/histo_data/MH03/experiment_1/"
+prefix = "./histo_data/MH03/experiment_1/"
+#prefix = "./"
+
 paths.append('us_imu_exe_times_file')
 paths.append('us_left_camera_exe_times_file')
 paths.append('ms_tracking_exe_times_file')
