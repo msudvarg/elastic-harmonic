@@ -15,8 +15,22 @@ Generates periods for utilization bounds of 0.1--0.5
 #include <iostream>
 #include <array>
 #include <cmath>
+#include <string>
+
+constexpr int n = 5;
+std::array<float, n> utilizations {0.5, 0.4, 0.3, 0.2, 0.1};
+std::array<Tasks, n> tasks;
 
 Harmonic_Elastic elastic_space {3};
+
+void print(const int i, const std::string name) {
+    std::cout << name << " = [";
+    for (int u = 0; u < n; ++u) {
+        std::cout << ceil(tasks[u][i].t);
+        if(u < n-1) std::cout << ", ";
+    }
+    std::cout << "]" << std::endl;
+}
 
 int main(int argc, char * argv[]) {
 
@@ -30,25 +44,21 @@ int main(int argc, char * argv[]) {
         return 0;
     }
 
-    std::array<float, 5> utilizations {0.5, 0.4, 0.3, 0.2, 0.1};
 
-    std::cout << "Utilization T_image T_hk T_inv" << std::endl;
-
-    for (float u : utilizations) {        
+    for (int i = 0; i < n; ++i) {        
+        const float u = utilizations[i];
         Chain * chain = elastic_space.assign_periods_slow(u);
         if(!chain) {
             std::cout << "Utilization " << u << " is too low!" << std::endl;
             return 0;
         }
 
-        const Tasks tasks = elastic_space.get_tasks();
-
-        std::cout << u << ' '
-                  << ceil(tasks[0].t) << ' '
-                  << ceil(tasks[1].t) << ' '
-                  << ceil(tasks[2].t) << std::endl;
+        tasks[i] = elastic_space.get_tasks();
     }
 
+    print(0, "T_image");
+    print(1, "T_HK");
+    print(2, "T_inv");
 
     return 0;
 }
