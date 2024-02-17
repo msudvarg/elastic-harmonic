@@ -9,3 +9,6 @@ test:  scheduler_test.cc harmonic.cc task.cc
 
 synthetic: synthetic_tasksets.cc harmonic.cc task.cc
 	g++ synthetic_tasksets.cc harmonic.cc task.cc -o synthetic -Wall -O3
+
+fims_periods: fims_get_periods.cc harmonic.cc task.cc
+	g++ fims_get_periods.cc harmonic.cc task.cc -o fims_periods -Wno-narrowing -O3
