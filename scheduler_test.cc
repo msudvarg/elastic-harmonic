@@ -10,10 +10,9 @@ int main(int argc, char * argv[]) {
     if (argc > 1) u = atof(argv[1]);
 
     //Task takes T_min, T_max, C, E
-    elastic_space.add_task(Task {6,6,0.3,3});
-    elastic_space.add_task(Task {11,18,0.3,3});
-    elastic_space.add_task(Task {12,17,0.7,4});
-    elastic_space.add_task(Task {23,36,0.1,1});
+    elastic_space.add_task(Task {5,20,0.015,0.263});
+    elastic_space.add_task(Task {50,200,31.3,413});
+    elastic_space.add_task(Task {50,1200,270,4.94e5});
     elastic_space.generate();
 
     Tasks tasks = elastic_space.get_tasks();
@@ -26,7 +25,6 @@ int main(int argc, char * argv[]) {
     if(!verify_harmonic(tasks)) {
         std::cout << "Harmonic assignment invalid!" << std::endl;
     }
-    return 0;
 
 #ifdef DEBUGINFO
     std::cout << "\nRegion Space:\n";
@@ -41,7 +39,7 @@ int main(int argc, char * argv[]) {
 
     std::cout << "Minimum utilization accommodated: " << elastic_space.get_u_min() << std::endl;
 
-    for (float u = 0.1; u < 0.6; u+=0.1) {
+    for (float u = 0.1; u < 1.0; u+=0.05) {
 
         Chain * chain1 = elastic_space.assign_periods_slow(u);
         if(!chain1) {
