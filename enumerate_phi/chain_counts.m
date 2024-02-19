@@ -22,7 +22,7 @@ fontsize = 18;
 surf(N,K,Counts);
 xlabel("n", 'FontSize', labelsize);
 ylabel("k", 'FontSize', labelsize);
-zlabel("Number of Chains", 'FontSize', zlabelsize);
+zlabel("Number of PHIs", 'FontSize', zlabelsize);
 set(gca,'zscale','log')
 set(gca,'ColorScale','log')
 set(gca,'FontSize',fontsize)
@@ -48,7 +48,7 @@ UpperBound = griddata(chaincounts.n, chaincounts.k, chaincounts.upperbound, N, K
 surf(N,K,UpperBound);
 xlabel("n", 'FontSize', labelsize);
 ylabel("k", 'FontSize', labelsize);
-zlabel("Number of Chains", 'FontSize', zlabelsize);
+zlabel("Number of PHIs", 'FontSize', zlabelsize);
 set(gca,'zscale','log')
 set(gca,'ColorScale','log')
 set(gca,'FontSize',fontsize)
