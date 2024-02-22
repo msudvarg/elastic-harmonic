@@ -11,8 +11,8 @@ int main(int argc, char * argv[]) {
 
     //Task takes T_min, T_max, C, E
     elastic_space.add_task(Task {5,20,0.015,0.263});
-    elastic_space.add_task(Task {50,200,31.3,413});
-    elastic_space.add_task(Task {50,1200,270,4.94e5});
+    elastic_space.add_task(Task {50,200,19.5,4006});
+    elastic_space.add_task(Task {50,1200,163,11400});
     elastic_space.generate();
 
     Tasks tasks = elastic_space.get_tasks();
